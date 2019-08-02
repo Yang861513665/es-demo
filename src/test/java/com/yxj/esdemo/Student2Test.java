@@ -1,13 +1,20 @@
 package com.yxj.esdemo;
 
+import com.alibaba.fastjson.JSON;
 import com.yxj.esdemo.entity.Student;
 import com.yxj.esdemo.repository.StudentReposotory;
 import org.assertj.core.util.Lists;
+import org.elasticsearch.index.query.QueryBuilders;
+import org.elasticsearch.index.query.RangeQueryBuilder;
+import org.elasticsearch.index.query.TermQueryBuilder;
+import org.elasticsearch.search.SearchHits;
+import org.elasticsearch.search.aggregations.Aggregation;
 import org.elasticsearch.search.aggregations.AggregationBuilders;
 import org.elasticsearch.search.aggregations.bucket.terms.StringTerms;
 import org.elasticsearch.search.aggregations.bucket.terms.TermsAggregationBuilder;
 import org.elasticsearch.search.aggregations.metrics.cardinality.CardinalityAggregationBuilder;
 import org.elasticsearch.search.aggregations.metrics.cardinality.InternalCardinality;
+import org.elasticsearch.search.aggregations.metrics.sum.InternalSum;
 import org.elasticsearch.search.aggregations.metrics.sum.SumAggregationBuilder;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -15,6 +22,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.elasticsearch.core.ElasticsearchTemplate;
 import org.springframework.data.elasticsearch.core.query.NativeSearchQueryBuilder;
+import org.springframework.data.elasticsearch.core.query.Query;
 import org.springframework.data.elasticsearch.core.query.SearchQuery;
 import org.springframework.test.context.junit4.SpringRunner;
 
@@ -80,6 +88,74 @@ public class Student2Test {
             System.out.println(map);
             return null;
         });
-
     }
-}
+    @Test
+    public void testAgg2(){
+        TermQueryBuilder termQuery = QueryBuilders.termQuery("name", "stu7");
+        TermQueryBuilder termQuery2 = QueryBuilders.termQuery("name", "stu5");
+
+//        RangeQueryBuilder rangeBuilder = QueryBuilders.rangeQuery("createdAt").from("2019-06-25 00:00:00").to("2019-06-27 00:00:00");
+//        SumAggregationBuilder sumBuilder = AggregationBuilders.sum("amount_sum").field("amount");
+//        SumAggregationBuilder sumBuilder_ = AggregationBuilders.sum("used_amount_sum").field("used_amount");
+        CardinalityAggregationBuilder classCount = AggregationBuilders.cardinality("class_count").field("classNo");
+        CardinalityAggregationBuilder schoolCount = AggregationBuilders.cardinality("school_count").field("schoolNo");
+
+        SearchQuery searchQuery = new NativeSearchQueryBuilder()
+                .withIndices("people")
+                .withTypes("student")
+                .addAggregation(schoolCount)
+                .addAggregation(classCount)
+//                .withQuery(QueryBuilders.boolQuery().should(termQuery).should(termQuery2))
+//                .addAggregation(sumBuilder)
+//                .addAggregation(sumBuilder_)
+                .build();
+        elasticsearchTemplate.query(searchQuery,response -> {
+            InternalCardinality classCard =  response.getAggregations().get("class_count");
+            InternalCardinality schoolCard =  response.getAggregations().get("school_count");
+            System.out.println("class_count:" + classCard.getValue());
+            System.out.println("school_count:" +schoolCard.getValue());
+            return null;
+        });
+    }
+    @Test
+    public void test(){
+        /**
+         * 积分发放查询
+         * */
+            // 构建时间区间（增量） （暂定义时间存储es为 yyyy-MM-dd HH:mm:ss）
+            RangeQueryBuilder rangeBuilder = QueryBuilders.rangeQuery("createdAt").from("2019-04-16 00:00:00").to("2019-04-16 23:59:59");
+            // 构建积分类型为UP（UP代表积分获取，DOWN代表积分消耗）
+            TermQueryBuilder termQuery = QueryBuilders.termQuery("operateType", "UP");
+            // 按航道名称(对应es bizSourceType)
+            TermQueryBuilder termQuery2 = QueryBuilders.termQuery("bizSourceType", "C3");
+            TermQueryBuilder termQuery3 = QueryBuilders.termQuery("rule", "8");
+            // 积分发放用户求和（去重）
+            CardinalityAggregationBuilder cardBuilder = AggregationBuilders.cardinality("lmid_count").field("lmid");
+
+//            Map<String, Double> result = new HashMap<>();
+                    // 积分发放动作人数统计
+                    // 组合search
+                    SearchQuery searchQuery = new NativeSearchQueryBuilder()
+                            .withIndices("middle_point_details")
+                            .withTypes("point_details")
+                            .withQuery(QueryBuilders.boolQuery()
+                                    // todo 用户动作：积分发放动作人数统计【时间区间使用增量？？】
+                                    .must(rangeBuilder)
+                                    .must(termQuery)
+                                    .must(termQuery2)
+                                    .must(termQuery3))
+                            .addAggregation(cardBuilder)
+                            .build();
+                    elasticsearchTemplate.query(searchQuery, response -> {
+                        InternalCardinality cardinality = response.getAggregations().get("lmid_count");
+                        System.out.println(cardinality.getValue());
+                        System.out.println(cardinality.value());
+                        return cardinality.value();
+                    });
+                }
+            }
+//            log.info("-----es积分发放统计完毕, 结果: {}--------", JSON.toJSONString(result));
+//            return result;
+//        }
+//    }
+//}

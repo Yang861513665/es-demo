@@ -2,12 +2,15 @@ package com.yxj.esdemo.entity;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.elasticsearch.annotations.Document;
 import org.springframework.data.elasticsearch.annotations.Field;
 import org.springframework.data.elasticsearch.annotations.FieldType;
 
-import java.util.Date;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.util.*;
 
 /**
  * @author yangxj
@@ -16,6 +19,7 @@ import java.util.Date;
 @Document(indexName = "people",type = "student")
 @Data
 @AllArgsConstructor
+@NoArgsConstructor
 public class Student {
     @Id
     private Integer id;
@@ -29,4 +33,16 @@ public class Student {
     private String classNo;
     @Field(type = FieldType.Keyword)
     private String schoolNo;
+
+    public static void main(String[] args) throws NoSuchMethodException, ClassNotFoundException, IllegalAccessException, InstantiationException {
+       Class clazz =  Class.forName("com.yxj.esdemo.entity.Result");
+        Method method = clazz.getDeclaredMethod("show");
+        method.setAccessible(true);
+        try {
+            Object result = method.invoke(clazz.newInstance(), "world");
+            System.out.println(result);
+        } catch (InvocationTargetException e) {
+            e.printStackTrace();
+        }
+    }
 }
